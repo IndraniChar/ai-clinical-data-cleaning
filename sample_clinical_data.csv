@@ -1,0 +1,11 @@
+patient_id,age,gender,systolic_bp,diastolic_bp,diagnosis,visit_date
+PT-1001,45,M,120,80,Diabetes,2023-01-15
+PT-1002,32,F,118,78,Hypertension,2023-01-16
+PT-1003,28,M,122,82,Asthma,2023-01-17
+PT-1004,150,F,110,70,Cancer,2023-01-18  # ANOMALY: Age > 120
+PT-1005,52,M,220,30,Diabetes,2023-01-19  # ANOMALY: Extreme BP
+PT-1006,38,F,115,75,Hypertension,2023-01-20
+PT-1007,42,M,125,,Asthma,2023-01-21  # ANOMALY: Missing diastolic
+PT-1008,29,F,130,85,Unknown,2023-01-22  # ANOMALY: Invalid diagnosis
+PT-1009,35,M,119,79,Hypertension,2023-01-23
+PT-1010,41,F,90,150,Asthma,2023-01-24  # ANOMALY: Diastolic > systolic

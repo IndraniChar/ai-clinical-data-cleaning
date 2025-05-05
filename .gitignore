@@ -1,7 +1,8 @@
-venv/
-__pycache__/
-.ipynb_checkpoints/
+.env
+clinical_data.db
+__pycache__
 *.pyc
 *.pyo
 *.pyd
 .DS_Store
+.vscode
