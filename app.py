@@ -2,6 +2,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import sys
+!{sys.executable} -m pip install --upgrade pip
+!{sys.executable} -m pip install matplotlib==3.7.1 --user
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
