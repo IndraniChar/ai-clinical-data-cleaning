@@ -8,3 +8,6 @@ streamlit-authenticator==0.2.3
 fpdf2==2.7.4
 python-dotenv==1.0.0
 sqlalchemy==2.0.23  # For better SQLite handling
+pyarrow>=15.0.0
+streamlit-authenticator==0.2.3
+extra-streamlit-components==0.1.60

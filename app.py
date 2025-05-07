@@ -1,8 +1,8 @@
-# app.py - FULLY TESTED DEPLOYMENT VERSION
+# app.py - UPDATED VERSION WITH FIXES
 import os
-os.environ['MPLBACKEND'] = 'Agg'  # Non-interactive backend
+os.environ['MPLBACKEND'] = 'Agg'
 import matplotlib
-matplotlib.use('Agg')  # Double confirmation
+matplotlib.use('Agg')
 
 import streamlit as st
 import pandas as pd
@@ -10,13 +10,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
-from io import BytesIO
 import sqlite3
 from fpdf import FPDF
 from sklearn.ensemble import IsolationForest
 import streamlit_authenticator as stauth
 from dotenv import load_dotenv
-import base64
+import extra_streamlit_components as stx
 
 # --- Constants ---
 REQUIRED_COLUMNS = {
@@ -31,6 +30,16 @@ def init_db():
     """Initialize SQLite database with proper schema"""
     conn = sqlite3.connect('clinical_data.db')
     c = conn.cursor()
+    
+    # Create patients table with all required columns
+    c.execute('''CREATE TABLE IF NOT EXISTS patients
+                 (patient_id TEXT,
+                  age REAL,
+                  systolic_bp REAL,
+                  diastolic_bp REAL,
+                  ml_anomaly INTEGER DEFAULT 0,
+                  is_anomaly INTEGER DEFAULT 0)''')
+                  
     c.execute('''CREATE TABLE IF NOT EXISTS analyses
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -44,6 +53,7 @@ def init_db():
 def setup_auth():
     """Configure secure authentication"""
     if 'auth' not in st.session_state:
+        cookie_manager = stx.CookieManager()
         load_dotenv()
         credentials = {
             "usernames": {
@@ -57,7 +67,8 @@ def setup_auth():
             credentials,
             "clinical_auth",
             "auth_key",
-            cookie_expiry_days=30
+            cookie_expiry_days=30,
+            cookie_manager=cookie_manager
         )
     return st.session_state.auth.login("Login", "main")
 
@@ -68,7 +79,7 @@ def analyze_data(df, threshold=0.2):
         # Validate input
         missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
         if missing:
-            raise ValueError(f"Missing columns: {missing}")
+            raise ValueError(f"Missing required columns: {missing}")
         
         df = df.copy()
         numeric_cols = ['age', 'systolic_bp', 'diastolic_bp']
@@ -76,6 +87,7 @@ def analyze_data(df, threshold=0.2):
         # Convert and clean data
         for col in numeric_cols:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col].fillna(df[col].median(), inplace=True)
         
         # Rule-based anomalies
         conditions = {
@@ -86,12 +98,12 @@ def analyze_data(df, threshold=0.2):
         
         # ML Anomaly Detection
         clf = IsolationForest(contamination=threshold, random_state=42)
-        df['ml_anomaly'] = clf.fit_predict(df[numeric_cols].fillna(0)) == -1
+        df['ml_anomaly'] = (clf.fit_predict(df[numeric_cols]) == -1).astype(int)
         
         # Combine results
         for name, condition in conditions.items():
-            df[name] = condition
-        df['is_anomaly'] = df[list(conditions.keys())].any(axis=1) | df['ml_anomaly']
+            df[name] = condition.astype(int)
+        df['is_anomaly'] = (df[list(conditions.keys())].any(axis=1) | (df['ml_anomaly'] == 1)).astype(int)
         
         return df, list(conditions.keys())
     
@@ -109,6 +121,7 @@ def generate_report(df, format='pdf'):
         pdf.cell(200, 10, txt="Clinical Data Report", ln=1, align='C')
         pdf.cell(200, 10, txt=f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=1)
         pdf.cell(200, 10, txt=f"Patients Analyzed: {len(df)}", ln=1)
+        pdf.cell(200, 10, txt=f"Anomalies Found: {df['is_anomaly'].sum()}", ln=1)
         pdf.output("report.pdf")
         return open("report.pdf", "rb")
     else:
@@ -121,7 +134,6 @@ def main():
     name, auth_status, username = setup_auth()
     
     if not auth_status:
-        st.warning("Please login to access the dashboard")
         return
     
     st.title(f"🏥 Clinical Data Dashboard | Welcome {name}")
@@ -137,6 +149,11 @@ def main():
             raw_df = pd.read_csv(uploaded_file)
             processed_df, anomalies = analyze_data(raw_df, sensitivity)
             
+            # Ensure all required columns exist before saving
+            for col in ['ml_anomaly', 'is_anomaly'] + anomalies:
+                if col not in processed_df.columns:
+                    processed_df[col] = 0
+            
             # Save to database
             conn = sqlite3.connect('clinical_data.db')
             processed_df.to_sql('patients', conn, if_exists='append', index=False)
@@ -148,8 +165,9 @@ def main():
             # Metrics dashboard
             col1, col2, col3 = st.columns(3)
             col1.metric("Total Records", len(processed_df))
-            col2.metric("Anomalies", f"{processed_df['is_anomaly'].sum()}")
-            col3.metric("Top Issue", processed_df[anomalies].sum().idxmax())
+            col2.metric("Anomalies", processed_df['is_anomaly'].sum())
+            top_issue = processed_df[anomalies].sum().idxmax() if anomalies else "None"
+            col3.metric("Top Issue", top_issue)
             
             # Tabs interface
             tab1, tab2, tab3 = st.tabs(["📊 Data", "📈 Visuals", "📥 Export"])
@@ -164,7 +182,7 @@ def main():
                     x='age',
                     y='systolic_bp',
                     hue='is_anomaly',
-                    palette={True: 'red', False: 'green'}
+                    palette={1: 'red', 0: 'green'}
                 )
                 st.pyplot(fig)
             
@@ -179,7 +197,7 @@ def main():
                     )
         
         except Exception as e:
-            st.error(f"❌ Processing error: {str(e)}")
+            st.error(f"Processing error: {str(e)}")
 
 if __name__ == "__main__":
     main()
