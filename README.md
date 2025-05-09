@@ -15,3 +15,6 @@ An AI-powered tool for detecting anomalies in clinical trial data.
 1. Upload clinical trial CSV
 2. Adjust sensitivity
 3. View/export results
+
+## 🚀 Quick Start
+https://ai-clinical-data-cleaning-5vewpm23rfwekjjh84gnuc.streamlit.app/
